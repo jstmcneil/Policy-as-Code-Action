@@ -21,7 +21,7 @@ do
   	/scripts/cfn-guard-data-wrangle.sh $outputted $f >> results/${base_name}.txt
     numb="$(cat results/${base_name}.txt | grep "Resource \[" | wc -l)"
     if [[ $numb -ne 0 ]]; then
-      echo $f
+      #echo $f
       echo -e "Total Failures: "  | sed -e '$s%$%'"$numb"'%' >> results/${base_name}.txt
     else
       rm results/${base_name}.txt
