@@ -16,7 +16,7 @@ do
   echo $base_name
   python $python_script $f
   ret=$?
-  if [[ $ret -eq 0 ]]; then=
+  if [[ $ret -eq 0 ]]; then
     echo $f > results/${base_name}.txt
   	/scripts/cfn-guard-data-wrangle.sh $outputted $f >> results/${base_name}.txt
     numb="$(cat results/${base_name}.txt | grep "Resource \[" | wc -l)"
