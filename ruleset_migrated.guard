@@ -15,8 +15,8 @@ rule EC2_001 WHEN %aws_ec2_securitygroupingress NOT EMPTY {
 #EC2-001
 let aws_ec2_securitygroup = Resources.*[ Type == "AWS::EC2::SecurityGroup" ]
 rule EC2_001 WHEN %aws_ec2_securitygroup NOT EMPTY {
-    %aws_ec2_securitygroup.Properties {
-        SecurityGroupIngress.CidrIp EXISTS <<EC2-001: EC2 instances must not be exposed directly to open traffic (0.0.0.0/0)>>
+    %aws_ec2_securitygroup {
+        Properties.SecurityGroupIngress.CidrIp EXISTS <<EC2-001: EC2 instances must not be exposed directly to open traffic (0.0.0.0/0)>>
     }
 }
 
