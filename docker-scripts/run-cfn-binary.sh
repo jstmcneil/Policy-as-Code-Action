@@ -12,6 +12,7 @@ mkdir results
 echo "Files in order of scanned: "
 find . -type f \( -iname \*.yaml -o -iname \*.json -o -iname \*.yml \) -follow | while read -d $'\0' f
 do
+  echo $f
   base_name="$(basename -- $f)"
   echo $base_name
   python $python_script $f
