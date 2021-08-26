@@ -18,7 +18,7 @@ rule EC2_001 WHEN %aws_ec2_securitygroup NOT EMPTY {
     %aws_ec2_securitygroup {
         Properties {
             SecurityGroupIngress {
-                CidrIp exists <<EC2-001: EC2 instances must not be exposed directly to open traffic (0.0.0.0/0)>>
+                CidrIp != "0.0.0.0/0" <<EC2-001: EC2 instances must not be exposed directly to open traffic (0.0.0.0/0)>>
             }
         }
     }
