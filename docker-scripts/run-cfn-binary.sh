@@ -1,5 +1,5 @@
 #!/bin/bash
-echo $1
+
 python_script="/scripts/python-checkforcfn.py"
 # Replace w/ paramatarized ruleset.
 outputted="/ruleset_migrated.guard"
