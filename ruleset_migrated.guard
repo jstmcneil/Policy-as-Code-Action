@@ -1,0 +1,539 @@
+##################################
+# Description: AWS Policy-as-Code combined ruleset. Please refer Policy-as-Code AWS Service Control Mapping Excel Sheet for more details on rules.
+# Syntax: AWS Cfn-Guard version2.0.2 syntax
+# Date:: 1 July, 2021
+##################################
+
+#EC2-001
+let aws_ec2_securitygroupingress = Resources.*[ Type == "AWS::EC2::SecurityGroupIngress" ]
+rule EC2_001 WHEN %aws_ec2_securitygroupingress NOT EMPTY {
+    %aws_ec2_securitygroupingress {
+        Properties.CidrIp != "0.0.0.0/0" <<EC2-001: EC2 instances must not be exposed directly to open traffic (0.0.0.0/0)>>
+    }
+}
+
+
+#EC2-008
+let aws_ec2_volume = Resources.*[ Type == "AWS::EC2::Volume" ]
+rule EC2_008 WHEN %aws_ec2_volume NOT EMPTY {
+    %aws_ec2_volume {
+        Properties.Encrypted != false <<EC2-008: EC2 volumes should be encrypted>>
+    }
+}
+
+#LA-001
+let aws_lambda_permission = Resources.*[ Type == "AWS::Lambda::Permission" ]
+rule LA_001 WHEN %aws_lambda_permission NOT EMPTY {
+    %aws_lambda_permission {
+        Properties.Principal != /.'*'/ <<LA-001: Lambda functions should not have Principal element value set to "*" in Resource Based Policy>>
+        Properties.Principal.AWS != /.'*'/ <<LA-001: Lambda functions should not have Principal element value set to { "AWS": "*" } in Resource Based Policy>>
+        Properties.Condition.StringEquals.'AWS:SourceAccount' NOT EXISTS <<LA-001: Lambda functions policy should not use any Condition clauses such as 'Condition': {'StringEquals': { 'AWS:SourceAccount': '<aws_account_number>' } } to filter the access>>
+    }
+}
+
+
+#S3-001
+let aws_s3_bucket = Resources.*[ Type == "AWS::S3::Bucket" ]
+rule S3_001 WHEN %aws_s3_bucket NOT EMPTY {
+    %aws_s3_bucket {
+        Properties.PublicAccessBlockConfiguration.BlockPublicAcls == true <<S3-001: S3 should be set to block public ACLs>>
+        Properties.PublicAccessBlockConfiguration.BlockPublicPolicy == true <<S3-001: S3 should be set to block public policies>>
+        Properties.PublicAccessBlockConfiguration.IgnorePublicAcls == true <<S3-001: S3 should be set to ignore public ACLs>>
+        Properties.PublicAccessBlockConfiguration.RestrictPublicBuckets == true <<S3-001: S3 should be set to restrict public buckets>>
+    }
+}
+
+
+#S3-002
+let aws_s3_bucket = Resources.*[ Type == "AWS::S3::Bucket" ]
+rule S3_002 WHEN %aws_s3_bucket NOT EMPTY {
+    %aws_s3_bucket {
+        Properties.BucketEncryption.ServerSideEncryptionConfiguration[*].ServerSideEncryptionByDefault.SSEAlgorithm == /.*/ <<S3-002: S3 bucket encryption should be enabled>>
+    }
+}
+
+
+#S3-011
+let aws_s3_bucket = Resources.*[ Type == "AWS::S3::Bucket" ]
+rule S3_011 WHEN %aws_s3_bucket NOT EMPTY {
+    %aws_s3_bucket {
+        Properties.Tags EXISTS <<S3-011: S3 Bucket should contain tags>>
+    }
+}
+
+
+#EFS-002
+let aws_efs_filesystem = Resources.*[ Type == "AWS::EFS::FileSystem" ]
+rule EFS_002 WHEN %aws_efs_filesystem NOT EMPTY {
+    %aws_efs_filesystem {
+        Properties.Encrypted == true <<EFS-002: EFS file system should be encrypted>>
+    }
+}
+
+
+#FSX-001
+let aws_fsx_filesystem = Resources.*[ Type == "AWS::FSx::FileSystem" ]
+rule FSX_001 WHEN %aws_fsx_filesystem NOT EMPTY {
+    %aws_fsx_filesystem {
+        Properties.KmsKeyId EXISTS <<FSX-001: Amazon FSx file systems must be encrypted at rest>>
+    }
+}
+
+
+#EMR-001
+let aws_emr_cluster = Resources.*[ Type == "AWS::EMR::Cluster" ]
+rule EMR_001_01 WHEN %aws_emr_cluster NOT EMPTY {
+    %aws_emr_cluster {
+        Properties.SecurityConfiguration EXISTS <<EMR:001: All EBS Volumes used in the EMR cluster must be encrypted>>
+    }
+}
+let aws_emr_securityconfiguration_resources = Resources.*[ Type == 'AWS::EMR::SecurityConfiguration' ]
+rule EMR_001_02 when %aws_emr_securityconfiguration_resources !empty {
+  %aws_emr_securityconfiguration_resources.Properties {
+  	SecurityConfiguration.EncryptionConfiguration.AtRestEncryptionConfiguration.LocalDiskEncryptionConfiguration.EnableEbsEncryption == "true"
+  	SecurityConfiguration.EncryptionConfiguration.AtRestEncryptionConfiguration.LocalDiskEncryptionConfiguration.AwsKmsKey IS_STRING
+  	SecurityConfiguration.EncryptionConfiguration.AtRestEncryptionConfiguration.LocalDiskEncryptionConfiguration.EncryptionKeyProviderType EXISTS
+  	<<EMR:001: All EBS Volumes should be encrypted by configuring Local Disk Configuation under EMR Security Configuation>>
+  }
+}
+
+
+#GL-001
+let aws_glue_securityconfiguration = Resources.*[ Type == "AWS::Glue::SecurityConfiguration" ]
+rule GL_001 WHEN %aws_glue_securityconfiguration NOT EMPTY {
+    %aws_glue_securityconfiguration {
+        Properties.EncryptionConfiguration EXISTS <<GL-001: Data stored in Glue must be encrypted>>
+    }
+}
+
+
+#KI-001
+let aws_kinesis_stream = Resources.*[ Type == "AWS::Kinesis::Stream" ]
+rule KI_001 WHEN %aws_kinesis_stream NOT EMPTY {
+    %aws_kinesis_stream {
+        Properties.StreamEncryption.EncryptionType EXISTS <<KI-001: Data stored in Kinesis Data Streams / Firehose must be encrypted at rest>>
+    }
+}
+
+
+#SM-001
+let aws_sagemaker_notebookinstance = Resources.*[ Type == "AWS::SageMaker::NotebookInstance" ]
+rule SM_001 WHEN %aws_sagemaker_notebookinstance NOT EMPTY {
+    %aws_sagemaker_notebookinstance {
+        Properties.KmsKeyId EXISTS <<SM-001: Data stored in SageMaker must be encrypted at rest>>
+    }
+}
+
+
+#RDS-002
+let aws_rds_dbinstance = Resources.*[ Type == "AWS::RDS::DBInstance" ]
+rule RDS_002 WHEN %aws_rds_dbinstance NOT EMPTY {
+    %aws_rds_dbinstance {
+        Properties.StorageEncrypted == true <<RDS-002: Storage encryption should be enabled>>
+    }
+}
+
+
+#RDS-004
+let aws_rds_dbinstance = Resources.*[ Type == "AWS::RDS::DBInstance" ]
+rule RDS_004 WHEN %aws_rds_dbinstance NOT EMPTY {
+    %aws_rds_dbinstance {
+        Properties.PubliclyAccessible != true <<RDS-004: RDS instances must not be publicially accessible>>
+    }
+}
+
+#RDS-017
+let aws_secrets_manager_secret_resources = Resources.*[ Type == 'AWS::SecretsManager::Secret' ]
+rule RDS_017_01 when %aws_secrets_manager_secret_resources !empty {
+  %aws_secrets_manager_secret_resources.Properties {
+  	GenerateSecretString EXISTS
+  }
+}
+let aws_secrets_manager_secret_target_attachment_resources = Resources.*[ Type == 'AWS::SecretsManager::SecretTargetAttachment' ]
+rule RDS_017_02 when %aws_secrets_manager_secret_target_attachment_resources !empty {
+  %aws_secrets_manager_secret_target_attachment_resources.Properties {
+  	SecretId EXISTS
+  	TargetId EXISTS
+  	TargetType == 'AWS::RDS::DBInstance'
+  	<<RDS-017: RDS credentials should be stored and retrieved from AWS Secrets Manager>>
+  }
+}
+let aws_secrets_manager_rotation_schedule_resources = Resources.*[ Type == 'AWS::SecretsManager::RotationSchedule' ]
+rule RDS_017_03 when %aws_secrets_manager_rotation_schedule_resources !empty {
+  %aws_secrets_manager_rotation_schedule_resources.Properties {
+  	SecretId EXISTS
+  	RotationRules.AutomaticallyAfterDays EXISTS 
+  	<<RDS-017: RDS credential rotation rule. Specify the number of days for password rotation>> 
+  }
+}
+
+
+#DY-001
+let aws_dynamodb_table = Resources.*[ Type == "AWS::DynamoDB::Table" ]
+rule DY_001 WHEN %aws_dynamodb_table NOT EMPTY {
+    %aws_dynamodb_table {
+        Properties.SSESpecification.SSEEnabled == true <<DY-001: DynamoDB tables should be encrypted with CMKs>>
+    }
+}
+
+
+#RS-002
+let aws_redshift_cluster = Resources.*[ Type == "AWS::Redshift::Cluster" ]
+rule RS_002 WHEN %aws_redshift_cluster NOT EMPTY {
+    %aws_redshift_cluster {
+        Properties.Encrypted == true <<RS-002: Redshift cluster storage must be encrypted>>
+    }
+}
+
+#RS-003
+let aws_redshift_cluster = Resources.*[ Type == "AWS::Redshift::Cluster" ]
+rule RS_003 WHEN %aws_redshift_cluster NOT EMPTY {
+    %aws_redshift_cluster {
+        Properties.PubliclyAccessible == false <<RS-003: Databasae should not be publicly accessible>>
+    }
+}
+
+#RS-008
+let aws_secrets_manager_secret_resources = Resources.*[ Type == 'AWS::SecretsManager::Secret' ]
+rule RS_008_01 when %aws_secrets_manager_secret_resources !empty {
+  %aws_secrets_manager_secret_resources.Properties {
+  	GenerateSecretString EXISTS
+  	<<RS-008: Redshift credentials should be stored and retrieved from AWS Secrets Manager>>
+  }
+}
+
+let aws_secrets_manager_secret_target_attachment_resources = Resources.*[ Type == 'AWS::SecretsManager::SecretTargetAttachment' ]
+rule RS_008_02 when %aws_secrets_manager_secret_target_attachment_resources !empty {
+  %aws_secrets_manager_secret_target_attachment_resources.Properties {
+  	SecretId EXISTS
+  	TargetId EXISTS
+  	TargetType == "AWS::Redshift::Cluster"
+  	<<RS-008: Redshift credentials should be stored and retrieved from AWS Secrets Manager>>
+  }
+}
+
+let aws_secrets_manager_rotation_schedule_resources = Resources.*[ Type == 'AWS::SecretsManager::RotationSchedule' ]
+rule RS_008_03 when %aws_secrets_manager_rotation_schedule_resources !empty {
+  %aws_secrets_manager_rotation_schedule_resources.Properties {
+  	SecretId EXISTS
+  	RotationRules.AutomaticallyAfterDays EXISTS 
+  	<<RS-008: Redshift credential rotation rule. Specify the number of days for password rotation>> 
+  }
+}
+
+
+#NE-002
+let aws_neptune_dbcluster = Resources.*[ Type == "AWS::Neptune::DBCluster" ]
+rule NE_002 WHEN %aws_neptune_dbcluster NOT EMPTY {
+    %aws_neptune_dbcluster {
+        Properties.StorageEncrypted != false <<NE-002: Data stored in Neptune DB must be encrypted. Any Read Replicas must also be encrypted.>>
+    }
+}
+
+
+#DMS-001
+let aws_dms_replicationinstance = Resources.*[ Type == "AWS::DMS::ReplicationInstance" ]
+rule DMS_001 WHEN %aws_dms_replicationinstance NOT EMPTY {
+    %aws_dms_replicationinstance {
+        Properties.KmsKeyId EXISTS <<DMS-001: Replication instance storage must be encrypted>>
+    }
+}
+
+
+#DDB-001
+let aws_docdb_dbcluster_resources = Resources.*[ Type == 'AWS::DocDB::DBCluster' ]
+rule DDB_001 when %aws_docdb_dbcluster_resources !empty {
+  %aws_docdb_dbcluster_resources.Properties {
+  	KmsKeyId EXISTS <<DDB-001: Data stored in Document DB must be encrypted>>
+  }
+}
+
+#SNS-003
+let aws_sns_topic_resources = Resources.*[ Type == 'AWS::SNS::Topic' ]
+rule SNS_003 when %aws_sns_topic_resources !empty {
+  %aws_sns_topic_resources.Properties {
+  	KmsMasterKeyId EXISTS <<SNS-003: Data stored in SNS must be encrypted with Server Side Encryption>>
+  }
+}
+
+#SQS-003
+let aws_sqs_queue_resources = Resources.*[ Type == 'AWS::SQS::Queue' ]
+rule SQS_003 when %aws_sqs_queue_resources !empty {
+  %aws_sqs_queue_resources.Properties {
+  	KmsMasterKeyId EXISTS <<SQS-003: Data stored in SQS must be encrypted with Server Side Encryption>>
+  }
+}
+
+#MQ-001
+let aws_amazonmq_broker = Resources.*[ Type == "AWS::AmazonMQ::Broker" ]
+rule MQ_001 WHEN %aws_amazonmq_broker NOT EMPTY {
+    %aws_amazonmq_broker {
+        Properties.EncryptionOptions.UseAwsOwnedKey EXISTS <<MQ-001: Data stored in Amazon MQ must be encrypted at rest>>
+    }
+}
+
+
+#IAM-001
+let aws_iam_role = Resources.*[ Type == "AWS::IAM::Role" ]
+rule IAM_001 WHEN %aws_iam_role NOT EMPTY {
+    %aws_iam_role {
+        Properties.AssumeRolePolicyDocument.Statement[*].Action[*] != "*" <<IAM-001: Avoid wildcard operations when specifying IAM actions>>
+    }
+}
+
+
+#IAM-004
+let aws_iam_role = Resources.*[ Type == "AWS::IAM::Role" ]
+rule IAM_004 WHEN %aws_iam_role NOT EMPTY {
+    %aws_iam_role.Properties {
+        AssumeRolePolicyDocument.Statement[*].NotPrincipal EXISTS <<IAM-004: IAM Roles must not allow all principals to assume the role (e.g., Specify explicit ARN values in NotPrincipal section on what resources/accounts can not assume this role>>
+    }
+}
+
+
+#IAM-005
+let aws_iam_policy = Resources.*[ Type == "AWS::IAM::Policy" ]
+rule IAM_005 WHEN %aws_iam_policy NOT EMPTY {
+    %aws_iam_policy {
+        Properties EMPTY <<IAM-005: IAM identities must not have inline policy attached (i.e. users, group, roles)>>
+    }
+}
+
+#IAM-006
+let aws_iam_role = Resources.*[ Type == "AWS::IAM::Role" ]
+rule IAM_006 WHEN %aws_iam_role NOT EMPTY {
+    %aws_iam_role.Properties {
+        AssumeRolePolicyDocument.Statement[*].NotAction !EXISTS <<IAM-004: IAM-006: IAM roles must not allow "NotAction">>
+    }
+}
+
+
+#EKS-006
+let aws_iam_role_resources = Resources.*[ Type == 'AWS::IAM::Role' ]
+rule EKS_006 when %aws_iam_role_resources !empty {
+  %aws_iam_role_resources.Properties {
+  	Policies.PolicyDocument.Statement[*].Effect == 'Deny'
+  	Policies.PolicyDocument.Statement[*].Condition.Bool.'aws:SecureTransport' == 'false'
+  	<<EKS-006: Traffic to or from EKS resources must be encrypted in transit using TLS 1.2 or above>>
+  }
+} 
+
+
+#LA-003
+let aws_serverless_function_resources = Resources.*[ Type == 'AWS::Serverless::Function' ]
+rule LA_003 when %aws_serverless_function_resources !empty {
+  %aws_serverless_function_resources.Properties {
+  	Policies[*].Statement[*].Action != /."*"/
+  	Policies[*].Statement[*].Resources != /."*"/
+  	<<LA-003: Lambda functions must not be granted full administrator access execution privileges>>
+  }
+}
+
+
+#LA-005
+let aws_lambda_function = Resources.*[ Type == "AWS::Lambda::Function" ]
+rule LA_005 WHEN %aws_lambda_function NOT EMPTY {
+    %aws_lambda_function.Properties {
+        KmsKeyArn EXISTS <<LA-005: Lambda enviornment variables must be encrypted at rest>>
+    }
+}
+
+
+#S3-003
+let aws_s3_bucketpolicy_resources = Resources.*[ Type == 'AWS::S3::BucketPolicy' ]
+rule S3_003 when %aws_s3_bucketpolicy_resources !empty {
+  %aws_s3_bucketpolicy_resources.Properties {
+  	PolicyDocument.Statement[*].Effect == 'Allow'
+  	PolicyDocument.Statement[*].Condition.Bool.'aws:SecureTransport' == 'true'
+  	<< S3-003: The S3 Bucket Policy must enforce secure HTTPS connections>>
+  }
+}
+
+#S3-006
+let your_bucket = Resources.*[ Type == 'AWS::S3::Bucket' ]
+let your_bucket_with_logging_configuration = %your_bucket[ Properties.LoggingConfiguration EXISTS ]
+let your_bucket_without_logging_configuration = %your_bucket[ Properties.LoggingConfiguration NOT EXISTS ]
+
+rule S3_006 {
+    WHEN %your_bucket_with_logging_configuration !EMPTY {
+        %your_bucket_with_logging_configuration.LoggingConfiguration EXISTS << S3-006: S3 Server Access Logging must be enabled on source bucket
+    }
+}
+
+rule S3_006 {
+    WHEN %your_bucket_without_logging_configuration !EMPTY {
+        %your_bucket_without_logging_configuration.AccessControl == 'LogDeliveryWrite' << S3-006: S3 destination bucket should have LogDeliveryWrite as the AccessControl
+    }
+}
+
+#S3-007
+let aws_cloudtrail_trail = Resources.*[ Type == "AWS::CloudTrail::Trail" ]
+rule S3_007 WHEN %aws_cloudtrail_trail NOT EMPTY {
+    %aws_cloudtrail_trail {
+        Properties.IsLogging == true
+        Properties.S3BucketName EXISTS
+        Properties.EventSelectors[*].DataResources[*].Type == "AWS::S3::Object"
+        Properties.EventSelectors[*].DataResources[*].Values[*] EXISTS
+        << S3-007: Object Level Logging must be enabled>>
+    }
+}
+
+#RDS-004
+let aws_rds_dbinstance = Resources.*[ Type == "AWS::RDS::DBInstance" ]
+rule RDS_004 WHEN %aws_rds_dbinstance NOT EMPTY {
+    %aws_rds_dbinstance {
+        Properties.PubliclyAccessible != true <<RDS-004: RDS instances must not be publicially accessible>>
+    }
+}
+
+#RS-005
+let aws_redshift_cluster_resources = Resources.*[ Type == 'AWS::Redshift::Cluster' ]
+rule RS_005 when %aws_redshift_cluster_resources !empty {
+  %aws_redshift_cluster_resources.Properties {
+  	LoggingProperties EXISTS <<RS-005: Audit logging in Redshift cluster must be enabled>>
+  }
+}
+let aws_redshift_clusterparametergroup_resources = Resources.*[ Type == 'AWS::Redshift::ClusterParameterGroup' ]
+rule RS_005 when %aws_redshift_clusterparametergroup_resources !empty {
+  %aws_redshift_clusterparametergroup_resources.Properties {
+  	Parameters[*].ParameterName == 'enable_user_activity_logging'
+  	Parameters[*].ParameterValue == 'true'
+  }
+}
+
+#RDS-006
+let aws_rds_dbinstance = Resources.*[ Type == "AWS::RDS::DBInstance" ]
+rule RDS_006 WHEN %aws_rds_dbinstance NOT EMPTY {
+    %aws_rds_dbinstance {
+        Properties.MultiAZ != false <<RDS-006: RDS MultiAZ must be enabled for RDS instances>>
+    }
+}
+
+
+#RDS-007
+let aws_rds_dbinstance = Resources.*[ Type == "AWS::RDS::DBInstance" ]
+rule RDS_007 WHEN %aws_rds_dbinstance NOT EMPTY {
+    %aws_rds_dbinstance {
+        Properties.AutoMinorVersionUpgrade != false <<RDS-007: RDS auto minor version upgrade must be enabled>>
+    }
+}
+
+
+#RDS-011
+let aws_rds_dbinstance = Resources.*[ Type == "AWS::RDS::DBInstance" ]
+rule RDS_011 WHEN %aws_rds_dbinstance NOT EMPTY {
+    %aws_rds_dbinstance {
+        Properties.DeletionProtection != false <<RDS-011: RDS instances must have Deletion Protection enabled>>
+    }
+}
+
+
+#RDS-013
+let aws_rds_dbinstance_resources = Resources.*[ Type == 'AWS::RDS::DBInstance' ]
+rule RDS_013 when %aws_rds_dbinstance_resources !empty {
+  %aws_rds_dbinstance_resources.Properties {
+  	DBParameterGroupName NOT EMPTY   <<RDS-013: Create and attach separate custom Options and Parameter Groups for every RDS deployment. Default groups must not be used. If you do not specify a value for the DBParameterGroupName property, the default DB parameter group for the specified engine and engine version is used.>>
+  }
+}
+
+#RDS-014
+let aws_rds_dbinstance_resources = Resources.*[ Type == 'AWS::RDS::DBInstance' ]
+rule RDS_014 when %aws_rds_dbinstance_resources !empty {
+  %aws_rds_dbinstance_resources.Properties {
+  	EnableCloudwatchLogsExports[*] IN ["error","general","audit", "slowquery", "listerner", "trace"]
+  	<<RDS-014: DB logs (access, error, trace, slow query, long running query) must be enabled for all database engines.>>
+  }
+}
+
+#EKS-001
+let awsqs_eks_cluster_resources = Resources.*[ Type == 'AWSQS::EKS::Cluster' ]
+rule EKS_001 when %awsqs_eks_cluster_resources !empty {
+  %awsqs_eks_cluster_resources.Properties {
+  	EnabledClusterLoggingTypes == ["LoggingEnabled","EKSClusterLoggingTypes","AWS::NoValue"] <<<<EKS-001: cfn-guard rule can be modified based on cloudformation template. Control Plane Logging must be enabled in EKS cluster including Kubernetes API audit logs>>
+  }
+}
+
+
+#SF-001
+let aws_stepfunctions_statemachine_resources = Resources.*[ Type == 'AWS::StepFunctions::StateMachine' ]
+rule SF_001 when %aws_stepfunctions_statemachine_resources !empty {
+  %aws_stepfunctions_statemachine_resources.Properties {
+  	LoggingConfiguration EXISTS <<SF-001: All Step Functions must be configured to export logs to a United-approved logging solution.>>
+  }
+}
+
+#RS-006
+let aws_redshift_clusterparametergroup_resources = Resources.*[ Type == 'AWS::Redshift::ClusterParameterGroup' ]
+rule RS_006 when %aws_redshift_clusterparametergroup_resources !empty {
+  %aws_redshift_clusterparametergroup_resources.Properties {
+  	Parameters[*].ParameterName == 'require_ssl'
+    Parameters[*].ParameterValue == 'true'
+  }
+}
+
+
+#EFS-003
+let aws_iam_role_resources = Resources.*[ Type == 'AWS::IAM::Role' ]
+rule EFS_003 when %aws_iam_role_resources !empty {
+  %aws_iam_role_resources.Properties {
+  	Policies.PolicyDocument.Statement[*].Effect == 'Allow'
+  	Policies.PolicyDocument.Statement[*].Condition.Bool.'aws:SecureTransport' == 'true'
+  }
+} 
+
+#AIR-005
+let aws_mwaa_environment_resources = Resources.*[ Type == 'AWS::MWAA::Environment' ]
+rule AIR_005 when %aws_mwaa_environment_resources !empty {
+  %aws_mwaa_environment_resources.Properties {
+  	LoggingConfiguration.DagProcessingLogs EXISTS <<AIR-005: Airflow logging should include Airflow Dag Processing Logs >> 
+  	LoggingConfiguration.SchedulerLogs EXISTS <<AIR-005: Airflow logging should include Airflow Scheduler Logs >> 
+  	LoggingConfiguration.TaskLogs EXISTS <<AIR-005: Airflow logging should include Airflow Task Logs >> 
+  	LoggingConfiguration.WebserverLogs EXISTS <<AIR-005: Airflow logging should include Airflow Webserver Logs>> 
+    LoggingConfiguration.WorkerLogs EXISTS <<AIR-005: Airflow logging should include Airflow Worker Logs>> 
+  }
+}
+
+#KMS-001
+let aws_keys = Resources.*[ Type == "AWS::KMS::Key" ]
+rule KMS_001 WHEN %aws_keys NOT EMPTY {
+    %aws_keys.Properties {
+        EnableKeyRotation == true <<KMS-001: Key Rotation must be enabled for customer managed CMKs to rotate all CMKs as per UA's Key rotation policy. >>
+    }
+}
+
+#ECR-002
+let aws_ecr_repository_resources = Resources.*[ Type == 'AWS::ECR::Repository' ]
+rule ECR_002 when %aws_ecr_repository_resources !empty {
+  %aws_ecr_repository_resources.Properties {
+  	EncryptionConfiguration.EncryptionType EXISTS
+  	EncryptionConfiguration.KmsKey EXISTS
+  	<<ECR-002: Container images stored in ECR must be encrypted>>
+  }
+}
+
+#SM-003
+let aws_sagemaker_notebookinstance_resources = Resources.*[ Type == 'AWS::SageMaker::NotebookInstance' ]
+rule SM_003 when %aws_sagemaker_notebookinstance_resources !empty {
+  %aws_sagemaker_notebookinstance_resources.Properties {
+  	SubnetId EXISTS
+  	SecurityGroupIds EXISTS
+  	SecurityGroupIds EXISTS
+  	<<SM-003: All SageMaker notebook instances must be attached to the VPC>>
+  }
+}
+
+#CF-002
+let aws_cloudfront_distribution_resources = Resources.*[ Type == 'AWS::CloudFront::Distribution' ]
+rule CD_002 when %aws_cloudfront_distribution_resources !empty {
+  %aws_cloudfront_distribution_resources.Properties {
+  	DistributionConfig.Origins[*].CustomOriginConfig.OriginSSLProtocols == 'TLSv1.2' <<CF-003: CloudFront must be configured to enforce HTTPS connections using TLS 1.2 or above>>
+  }
+}
+
+#CF-003
+let aws_cloudfront_distribution_resources = Resources.*[ Type == 'AWS::CloudFront::Distribution' ]
+rule CF_003 when %aws_cloudfront_distribution_resources !empty {
+  %aws_cloudfront_distribution_resources.Properties {
+  	DistributionConfig.Origins[*].CustomOriginConfig.OriginProtocolPolicy == 'https-only' <<CF-003: CloudFront must be configured to use HTTPS to communicate with the  origin>>
+  }
+}

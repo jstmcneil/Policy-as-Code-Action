@@ -1,0 +1,25 @@
+name: 'Docker-Action'
+description: 'Checks files w/ CFN-Guard and posts results to Teams webhook.'
+inputs:
+  ms-teams-webhook:  # id of input
+    description: 'Webhook to post results to.'
+    required: false
+  rule-file-name:  # id of input
+    description: 'Specific file-name to run against'
+    required: true
+    default: 'ruleset_migrated.guard'
+  color_style:  # id of input
+    description: 'Color style to present results, can be: light, dark, default'
+    required: true
+    default: 'default'
+  app_CI_key:  # id of input
+    description: 'Your application key, or app CI.'
+    required: true
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.rule-file-name }}
+    - ${{ inputs.app_CI_key }}
+    - ${{ inputs.color_style }} # can be dark, light, or default.
+    - ${{ inputs.ms-teams-webhook }}
