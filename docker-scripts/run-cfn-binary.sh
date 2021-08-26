@@ -10,7 +10,7 @@ fi
 
 mkdir results
 echo "Files in order of scanned: "
-find . -type f \( -iname \*.yaml -o -iname \*.json -o -iname \*.yml \) -follow -print0 | while read -d $'\0' f
+find . -type f \( -iname \*.yaml -o -iname \*.json -o -iname \*.yml \) -follow | while read -d $'\0' f
 do
   base_name="$(basename -- $f)"
   echo $base_name
@@ -21,6 +21,7 @@ do
   	/scripts/cfn-guard-data-wrangle.sh $outputted $f >> results/${base_name}.txt
     numb="$(cat results/${base_name}.txt | grep "Resource \[" | wc -l)"
     if [[ $numb -ne 0 ]]; then
+      echo $f
       echo -e "Total Failures: "  | sed -e '$s%$%'"$numb"'%' >> results/${base_name}.txt
     else
       rm results/${base_name}.txt
